@@ -1,22 +1,39 @@
 # CV personal con Docker Compose
 
-## Objetivo
-
-Aplicación web que presenta el currículum de Daniel Alberto Flores Uriona. React obtiene la información desde una API Node.js y la API consulta MySQL. Docker Compose coordina los tres servicios.
+Aplicación web de currículum personal de **Daniel Alberto Flores
+Uriona**. El frontend está desarrollado con React y Vite, obtiene los
+datos desde una API Node.js y esta API consulta MySQL. Docker Compose
+coordina los tres servicios.
 
 ## Tecnologías
 
-- React y Vite, servido en producción por Nginx `1.27-alpine`.
-- API Node.js `20-alpine` y MySQL `8.0`.
-- Dockerfiles propios, Docker Compose, una red compartida y un volumen persistente.
+- **Frontend:** React y Vite, servido en producción por Nginx
+  `1.27-alpine`.
+- **Backend:** API Node.js `20-alpine`.
+- **Base de datos:** MySQL `8.0`.
+- **Orquestación:** Docker Compose, red compartida `cv_network` y
+  volumen persistente `mysql_data`.
 
-## Estructura
+## Funcionalidad
+
+- Muestra los datos personales y las cuatro formaciones académicas.
+- Obtiene los datos del currículum desde la API y la base de datos.
+- Permite consultar la API del currículum y comprobar la conexión con
+  MySQL.
+- Inicializa las tablas y los datos mediante un script SQL cuando
+  MySQL crea por primera vez un directorio de datos vacío.
+- Conserva los datos de MySQL en el volumen persistente cuando se
+  reinician o recrean los contenedores sin eliminar el volumen.
+
+## Estructura del proyecto
 
 ```text
 cv-docker/
-├── backend/                 # API y Dockerfile
-├── database/init/           # Inicialización SQL de tablas y datos
-├── frontend/                # Aplicación React, Nginx y Dockerfile
+├── backend/                 # API Node.js y Dockerfile
+├── database/
+│   └── init/
+│       └── 01-init.sql      # Creación de tablas y datos iniciales
+├── frontend/                # React, Vite, Nginx y Dockerfile
 ├── compose.yaml
 ├── .env.example
 ├── .gitignore
@@ -24,58 +41,74 @@ cv-docker/
 └── README.md
 ```
 
-## Requisitos previos
+## Requisitos
 
-Instalar Docker Desktop con Docker Compose y tener Docker iniciado. No es necesario instalar Node.js ni MySQL en el equipo para ejecutar la aplicación. El puerto 3000, 3306 y 4000 deben estar disponibles.
+- Docker Desktop instalado y en ejecución, con Docker Compose
+  disponible.
+- Puertos `3000`, `3306` y `4000` disponibles.
+- No es necesario instalar Node.js ni MySQL directamente en el equipo
+  para ejecutar los servicios mediante Docker.
 
-## Variables de entorno
+## Configuración local
 
-Copia `.env.example` como `.env` en esta carpeta. El usuario de Docker Hub queda comentado para que el despliegue local use las etiquetas `flores-frontend:v1` y `flores-backend:v1`. Los valores incluidos son ilustrativos para pruebas locales, no son credenciales de Docker Hub ni credenciales para producción. Puedes cambiar las claves locales antes de iniciar los servicios. Mantén `.env` fuera de Git; ya está incluido en `.gitignore`.
+El archivo `.env` contiene las variables locales de conexión a MySQL.
+Debe permanecer fuera del control de versiones porque puede contener
+contraseñas. `.env.example` sirve como referencia de configuración.
 
-`DOCKERHUB_USER` debe descomentarse y reemplazarse por el nombre real de usuario de Docker Hub una vez creada la cuenta. Hasta que existan imágenes publicadas, Compose construye las etiquetas locales desde los Dockerfiles del proyecto.
+Si ya tienes configurado el proyecto, conserva tu `.env` actual. Para
+preparar una copia nueva, crea `.env` a partir de `.env.example` y
+verifica sus valores antes de iniciar los servicios.
 
-## Construcción e inicio
+El usuario de Docker Hub asociado a las imágenes de este proyecto es
+**`nidafu21`**. Los nombres de imagen previstos para la publicación son:
 
-Desde la carpeta del proyecto:
+- `nidafu21/flores-frontend:v1`
+- `nidafu21/flores-backend:v1`
 
-```powershell
-Copy-Item .env.example .env
-# Editar .env y sustituir las claves ilustrativas si se desea
-# Para construir explícitamente las dos imágenes locales:
-docker compose build
-# Iniciar los tres servicios:
-docker compose up -d
+## Ejecutar el proyecto
+
+Desde una terminal ubicada en la carpeta raíz `cv-docker`, ejecuta:
+
+```bash
+docker compose up -d --build
 ```
 
-El archivo Compose define exactamente `frontend`, `backend` y `database`. Los servicios comparten la red `cv_network`; MySQL utiliza el volumen `mysql_data`. La base de datos se inicializa automáticamente la primera vez que se crea el volumen. El backend espera la disponibilidad de MySQL y también reintenta la conexión.
+Comprueba el estado de los servicios:
 
-Al publicar, las referencias serán `USUARIO_DOCKERHUB/flores-frontend:v1` y `USUARIO_DOCKERHUB/flores-backend:v1`. Descomenta `DOCKERHUB_USER` y reemplaza el marcador por el usuario real; Compose usará esas referencias y las construirá si aún no están descargadas.
-
-## Comprobación
-
-Ver el estado de los contenedores:
-
-```powershell
+```bash
 docker compose ps
 ```
 
-Revisar los registros:
+El archivo `compose.yaml` define tres servicios: `frontend`, `backend` y
+`database`. Comparten la red `cv_network`. MySQL utiliza el volumen
+`mysql_data`; el backend espera a que la base de datos esté disponible y
+reintenta la conexión si es necesario.
 
-```powershell
-docker compose logs database backend frontend
-```
+## Aplicación y API
 
-Abrir la aplicación en [http://localhost:3000](http://localhost:3000). El frontend llama a `/api/cv`; Nginx reenvía esa ruta al backend dentro de la red Docker.
+Con los contenedores activos, abre estas direcciones:
 
-Consultar la API directamente en [http://localhost:4000/cv](http://localhost:4000/cv) o mediante el proxy de Nginx en [http://localhost:3000/api/cv](http://localhost:3000/api/cv). La respuesta debe incluir la persona y sus cuatro formaciones. El endpoint [http://localhost:4000/health](http://localhost:4000/health) comprueba la conexión a MySQL.
+- **Aplicación web:** <http://localhost:3000>
+- **API del currículum:** <http://localhost:4000/cv>
+- **API mediante el proxy del frontend:**
+  <http://localhost:3000/api/cv>
+- **Comprobación de conexión con MySQL:**
+  <http://localhost:4000/health>
 
-Verificar las tablas y filas desde el contenedor:
+El frontend solicita `/api/cv`. Nginx reenvía la solicitud al backend
+dentro de la red Docker. La respuesta de la API incluye los datos de la
+persona y sus cuatro formaciones académicas.
 
-```powershell
+## Verificar MySQL
+
+Abre la consola de MySQL desde el contenedor:
+
+```bash
 docker compose exec database mysql -u cv_user -p cv_personal
 ```
 
-Ingresa la clave configurada en `.env`, luego ejecuta:
+Introduce la contraseña configurada en `.env`. En el indicador `mysql>`,
+ejecuta:
 
 ```sql
 SHOW TABLES;
@@ -83,57 +116,41 @@ SELECT * FROM persona;
 SELECT * FROM formacion;
 ```
 
-La persona y las cuatro filas de formación se insertan desde `database/init/01-init.sql`. La imagen oficial de MySQL ejecuta estos scripts solamente cuando inicializa un directorio de datos vacío.
+La base de datos contiene las tablas `persona` y `formacion`. El archivo
+`database/init/01-init.sql` crea la estructura, establece la relación
+entre las tablas e inserta los datos iniciales: una persona y cuatro
+formaciones.
 
-## Detener y reinicializar
+Los scripts de `/docker-entrypoint-initdb.d` se ejecutan al inicializar
+un directorio de datos vacío. No vuelven a ejecutarse automáticamente si
+el volumen `mysql_data` ya contiene la base de datos.
 
-Detener y conservar la base de datos:
+## Registros de los servicios
 
-```powershell
+```bash
+docker compose logs database backend frontend
+```
+
+Para mostrar solo las últimas líneas:
+
+```bash
+docker compose logs --tail=50 database backend frontend
+```
+
+## Detener los servicios
+
+Para detener y eliminar los contenedores conservando los datos de MySQL:
+
+```bash
 docker compose down
 ```
 
-Para volver a ejecutar el SQL de inicialización en pruebas, elimina el volumen y crea los servicios de nuevo:
+Para volver a iniciar el proyecto:
 
-```powershell
-docker compose down -v
+```bash
 docker compose up -d
 ```
 
-**Aviso:** `docker compose down -v` elimina el volumen `mysql_data` y borra permanentemente los datos que contiene. No lo uses si necesitas conservar cambios.
+## Repositorio del código fuente
 
-## Publicación en Docker Hub
-
-1. Crear una cuenta personal en [Docker Hub](https://hub.docker.com/).
-2. Descomentar `DOCKERHUB_USER` en `.env` y reemplazar `USUARIO_DOCKERHUB` por el usuario real de esa cuenta.
-3. Iniciar sesión desde la terminal: `docker login -u TU_USUARIO`. Completar la autenticación en el flujo oficial; no guardar tokens ni contraseñas en el proyecto.
-4. Construir las imágenes con los nombres requeridos:
-
-   ```powershell
-   docker build -t TU_USUARIO/flores-frontend:v1 ./frontend
-   docker build -t TU_USUARIO/flores-backend:v1 ./backend
-   ```
-
-5. Publicarlas:
-
-   ```powershell
-   docker push TU_USUARIO/flores-frontend:v1
-   docker push TU_USUARIO/flores-backend:v1
-   ```
-
-6. Comprobar en Docker Hub que los repositorios `flores-frontend` y `flores-backend` aparecen en la cuenta y muestran la etiqueta `v1`. También se puede comprobar con `docker pull TU_USUARIO/flores-frontend:v1` y `docker pull TU_USUARIO/flores-backend:v1`.
-7. Después de publicar, volver a ejecutar `docker compose up -d` para usar las etiquetas configuradas. Actualizar primero `DOCKERHUB_USER` en `.env`.
-
-El proyecto no incluye una URL de GitHub ni afirma publicación alguna. Completa la URL del repositorio una vez creado y subido.
-
-## Pendientes para la entrega
-
-- Sustituir `FOTO_PENDIENTE` por una fotografía personal en `frontend/public/` y actualizar la ruta `foto` en el SQL si se cambia el nombre del archivo. No hace falta modificar el backend.
-- Crear la cuenta de Docker Hub, publicar las dos imágenes y registrar capturas reales.
-- Crear y subir el repositorio de GitHub.
-- Reunir las evidencias reales y elaborar el PDF académico según la lista de `EVIDENCIAS.md`.
-- Ejecutar las pruebas de Docker y navegación en el equipo donde Docker Desktop esté operativo.
-
-## Resultados de validación del entorno de preparación
-
-Validaciones observadas en el entorno de preparación: `docker compose config --quiet` aceptó la configuración y mostró exactamente tres servicios con las imágenes locales esperadas; `node --check backend/server.js` no reportó errores; las dependencias npm del frontend y backend se instalaron. La compilación React no terminó porque esbuild recibió `Access is denied` al recorrer directorios superiores al espacio de trabajo. El CLI de Docker está instalado, pero `docker info` no pudo conectar con el daemon (`docker_engine` no existe). Por estas limitaciones no se han construido imágenes, iniciado contenedores, conectado a MySQL ni comprobado el navegador. Consulta `EVIDENCIAS.md` para el estado de cada evidencia.
+**Repositorio GitHub:** https://github.com/NIDAFU21/cv-docker
