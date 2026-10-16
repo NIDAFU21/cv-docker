@@ -1,0 +1,69 @@
+name: cv-docker
+services:
+  database:
+    image: mysql:8.0
+    container_name: cv-database
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-cambia_esta_clave_local}
+      MYSQL_DATABASE: cv_personal
+      MYSQL_USER: ${MYSQL_USER:-cv_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-cambia_esta_clave_app}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - cv_network
+    healthcheck:
+      test: ["CMD-SHELL", 'mysqladmin ping -h 127.0.0.1 -uroot -p"$${MYSQL_ROOT_PASSWORD}" --silent']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: always
+
+  backend:
+    image: ${DOCKERHUB_USER:+${DOCKERHUB_USER}/}flores-backend:v1
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cv-backend
+    environment:
+      PORT: 4000
+      DB_HOST: database
+      DB_PORT: 3306
+      DB_NAME: cv_personal
+      DB_USER: ${MYSQL_USER:-cv_user}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-cambia_esta_clave_app}
+      DB_CONNECT_RETRY_MS: 3000
+    ports:
+      - "4000:4000"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - cv_network
+    restart: always
+
+  frontend:
+    image: ${DOCKERHUB_USER:+${DOCKERHUB_USER}/}flores-frontend:v1
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cv-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - cv_network
+    restart: always
+
+volumes:
+  mysql_data:
+
+networks:
+  cv_network:
+    driver: bridge
+
